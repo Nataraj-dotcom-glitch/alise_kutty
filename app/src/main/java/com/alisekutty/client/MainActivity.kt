@@ -1,7 +1,6 @@
 package com.alisekutty.client
 
 import android.Manifest
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
@@ -30,10 +29,9 @@ import java.util.zip.ZipInputStream
 class MainActivity : Activity() {
 
     private lateinit var web: WebView
-    private lateinit var status: TextView
 
     private val pickZip = 4102
-    private val micRequest = 4103
+    private val permissionRequestCode = 4103
 
     private var pendingWebPermission: PermissionRequest? = null
 
@@ -62,15 +60,16 @@ class MainActivity : Activity() {
         web.loadUrl("https://web.whatsapp.com/")
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    // --------------------------------------------------
+    // MAIN SCREEN
+    // --------------------------------------------------
+
     private fun buildScreen() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.BLACK)
         }
-
-        // HEADER
 
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -81,14 +80,10 @@ class MainActivity : Activity() {
 
         val title = TextView(this).apply {
             text = "Alise×Kutty ◆"
-            textSize = 20f
+            textSize = 19f
             setTextColor(gold)
-
-            layoutParams = LinearLayout.LayoutParams(
-                0,
-                -2,
-                1f
-            )
+            layoutParams =
+                LinearLayout.LayoutParams(0, -2, 1f)
         }
 
         val owner = Button(this).apply {
@@ -100,7 +95,7 @@ class MainActivity : Activity() {
             }
         }
 
-        val ext = Button(this).apply {
+        val extension = Button(this).apply {
             text = "OGxISAI"
             setTextColor(Color.BLACK)
             setBackgroundColor(gold)
@@ -111,11 +106,9 @@ class MainActivity : Activity() {
 
         bar.addView(title)
         bar.addView(owner)
-        bar.addView(ext)
+        bar.addView(extension)
 
-        // STATUS BAR
-
-        status = TextView(this).apply {
+        val status = TextView(this).apply {
             text = "BLACK & GOLD • WhatsApp Desktop + OGxISAI"
             textSize = 12f
             setTextColor(gold)
@@ -123,138 +116,137 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(25, 22, 12))
         }
 
-        // WEBVIEW
+        web = WebView(this).apply {
 
-        web = WebView(this)
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.databaseEnabled = true
+            settings.loadsImagesAutomatically = true
+            settings.mediaPlaybackRequiresUserGesture = false
 
-        web.settings.apply {
-
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            databaseEnabled = true
-
-            loadsImagesAutomatically = true
-            mediaPlaybackRequiresUserGesture = false
-
-            // DESKTOP USER AGENT
-
-            userAgentString =
-                "Mozilla/5.0 (X11; Linux x86_64) " +
+            // Desktop browser identity
+            settings.userAgentString =
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
                 "AppleWebKit/537.36 (KHTML, like Gecko) " +
                 "Chrome/131.0.0.0 Safari/537.36"
 
-            // DESKTOP VIEW FITTING
+            // Display desktop layout in portrait
+            settings.useWideViewPort = true
+            settings.loadWithOverviewMode = true
 
-            useWideViewPort = true
-            loadWithOverviewMode = true
+            // Disable manual zoom
+            settings.setSupportZoom(false)
+            settings.builtInZoomControls = false
+            settings.displayZoomControls = false
 
-            // DISABLE MANUAL ZOOM
+            settings.textZoom = 100
 
-            setSupportZoom(false)
-            builtInZoomControls = false
-            displayZoomControls = false
+            // Let WebView calculate the initial fit
+            setInitialScale(0)
 
-            // Allow normal web storage
+            CookieManager.getInstance()
+                .setAcceptThirdPartyCookies(this, true)
 
-            allowFileAccess = true
-            allowContentAccess = true
-        }
+            webChromeClient = object : WebChromeClient() {
 
-        CookieManager.getInstance()
-            .setAcceptThirdPartyCookies(web, true)
+                override fun onPermissionRequest(
+                    request: PermissionRequest
+                ) {
+                    runOnUiThread {
 
-        // WEB CHROME CLIENT
+                        val required = mutableListOf<String>()
 
-        web.webChromeClient = object : WebChromeClient() {
-
-            override fun onPermissionRequest(
-                request: PermissionRequest
-            ) {
-
-                runOnUiThread {
-
-                    val wantsAudio =
-                        request.resources.contains(
-                            PermissionRequest.RESOURCE_AUDIO_CAPTURE
-                        )
-
-                    if (
-                        wantsAudio &&
-                        ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            Manifest.permission.RECORD_AUDIO
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-
-                        pendingWebPermission = request
-
-                        ActivityCompat.requestPermissions(
-                            this@MainActivity,
-                            arrayOf(Manifest.permission.RECORD_AUDIO),
-                            micRequest
-                        )
-
-                    } else {
-
-                        val allowed = request.resources.filter {
-                            it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                        if (
+                            request.resources.contains(
+                                PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                            ) &&
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.RECORD_AUDIO
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            required.add(
+                                Manifest.permission.RECORD_AUDIO
+                            )
                         }
 
-                        if (allowed.isNotEmpty()) {
-                            request.grant(allowed.toTypedArray())
+                        if (
+                            request.resources.contains(
+                                PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                            ) &&
+                            ContextCompat.checkSelfPermission(
+                                this@MainActivity,
+                                Manifest.permission.CAMERA
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            required.add(
+                                Manifest.permission.CAMERA
+                            )
+                        }
+
+                        if (required.isNotEmpty()) {
+
+                            pendingWebPermission = request
+
+                            ActivityCompat.requestPermissions(
+                                this@MainActivity,
+                                required.toTypedArray(),
+                                permissionRequestCode
+                            )
+
                         } else {
-                            request.deny()
+
+                            val allowed = request.resources.filter {
+                                it == PermissionRequest.RESOURCE_AUDIO_CAPTURE ||
+                                it == PermissionRequest.RESOURCE_VIDEO_CAPTURE
+                            }
+
+                            if (allowed.isNotEmpty()) {
+                                request.grant(allowed.toTypedArray())
+                            } else {
+                                request.deny()
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // WEBVIEW CLIENT
+            webViewClient = object : WebViewClient() {
 
-        web.webViewClient = object : WebViewClient() {
-
-            override fun onPageFinished(
-                view: WebView?,
-                url: String?
-            ) {
-
-                super.onPageFinished(view, url)
-
-                if (url?.startsWith("https://web.whatsapp.com") == true) {
-
-                    applyEnabledStyles()
-
-                    // Keep OGxISAI disabled during initial login testing.
-                    // Enable it after confirming WhatsApp works.
-                }
-            }
-
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                url: String
-            ): Boolean {
-
-                if (
-                    url.startsWith("https://web.whatsapp.com") ||
-                    url.startsWith("https://www.whatsapp.com")
+                override fun onPageFinished(
+                    view: WebView?,
+                    url: String?
                 ) {
-                    return false
+                    super.onPageFinished(view, url)
+
+                    if (
+                        url?.startsWith(
+                            "https://web.whatsapp.com"
+                        ) == true
+                    ) {
+                        applyEnabledStyles()
+                        injectOgxIsai()
+                    }
                 }
 
-                try {
+                override fun shouldOverrideUrlLoading(
+                    view: WebView,
+                    url: String
+                ): Boolean {
+
+                    if (
+                        url.startsWith("https://web.whatsapp.com") ||
+                        url.startsWith("https://www.whatsapp.com")
+                    ) {
+                        return false
+                    }
+
                     startActivity(
                         Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     )
-                } catch (_: Exception) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        "Cannot open this link",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
 
-                return true
+                    return true
+                }
             }
         }
 
@@ -264,7 +256,7 @@ class MainActivity : Activity() {
         root.addView(
             web,
             LinearLayout.LayoutParams(
-                -1,
+                LinearLayout.LayoutParams.MATCH_PARENT,
                 0,
                 1f
             )
@@ -273,7 +265,52 @@ class MainActivity : Activity() {
         setContentView(root)
     }
 
+    // --------------------------------------------------
+    // OGxISAI INJECTOR
+    // --------------------------------------------------
+
+    private fun injectOgxIsai() {
+
+        runCatching {
+
+            val js = assets.open(
+                "ogxisai/injector.js"
+            ).bufferedReader().use {
+                it.readText()
+            }
+
+            val encoded = android.util.Base64.encodeToString(
+                js.toByteArray(Charsets.UTF_8),
+                android.util.Base64.NO_WRAP
+            )
+
+            val script = """
+                (function() {
+                    if (document.getElementById('ogxisai-marker')) return;
+
+                    var marker = document.createElement('script');
+                    marker.id = 'ogxisai-marker';
+
+                    var code = atob('$encoded');
+
+                    (0, Function)(code)();
+                })();
+            """.trimIndent()
+
+            web.evaluateJavascript(script, null)
+
+        }.onFailure {
+            Toast.makeText(
+                this,
+                "OGxISAI injector could not load",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // --------------------------------------------------
     // OWNER ACCESS
+    // --------------------------------------------------
 
     private fun showOwnerAccess() {
 
@@ -281,16 +318,16 @@ class MainActivity : Activity() {
             hint = "Enter owner phone number"
             inputType =
                 android.text.InputType.TYPE_CLASS_PHONE
-            setTextColor(Color.WHITE)
+            setTextColor(Color.BLACK)
         }
 
-        val box = LinearLayout(this).apply {
+        val layout = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24, 8, 24, 0)
 
             addView(
                 TextView(this@MainActivity).apply {
-                    text = "Owner access is configured for $ownerPhone"
+                    text = "Owner access is configured"
                     setTextColor(gold)
                 }
             )
@@ -300,13 +337,13 @@ class MainActivity : Activity() {
 
         AlertDialog.Builder(this)
             .setTitle("Alise×Kutty • Owner Access")
-            .setView(box)
+            .setView(layout)
             .setPositiveButton("Continue") { _, _ ->
 
-                if (
-                    input.text.toString().filter { it.isDigit() } ==
-                    ownerPhone
-                ) {
+                val entered = input.text.toString()
+                    .filter { it.isDigit() }
+
+                if (entered == ownerPhone) {
                     showOwnerDashboard()
                 } else {
                     Toast.makeText(
@@ -325,69 +362,63 @@ class MainActivity : Activity() {
         val options = arrayOf(
             "Generate 8-digit license key",
             "Revoke license key",
+            "Restore license key",
             "Ban phone number",
             "Unban phone number",
-            "View license / ban records",
-            "Support server and owner details"
+            "View records",
+            "Support details"
         )
 
         AlertDialog.Builder(this)
-            .setTitle("OWNER CONTROL • BLACK & GOLD")
+            .setTitle("OWNER CONTROL")
             .setItems(options) { _, which ->
 
                 when (which) {
-
                     0 -> generateLicenseKey()
-
                     1 -> changeLicenseStatus(true)
-
-                    2 -> changeBanStatus(true)
-
-                    3 -> changeBanStatus(false)
-
-                    4 -> showAdminRecords()
-
-                    5 -> showSupportDetails()
+                    2 -> changeLicenseStatus(false)
+                    3 -> changeBanStatus(true)
+                    4 -> changeBanStatus(false)
+                    5 -> showAdminRecords()
+                    6 -> showSupportDetails()
                 }
             }
             .setNegativeButton("Close", null)
             .show()
     }
 
+    // --------------------------------------------------
     // LICENSE GENERATION
+    // --------------------------------------------------
 
     private fun generateLicenseKey() {
 
-        val daysInput = EditText(this).apply {
+        val input = EditText(this).apply {
             hint = "Validity in days"
             inputType =
                 android.text.InputType.TYPE_CLASS_NUMBER
             setText("30")
-            setTextColor(Color.WHITE)
         }
 
         AlertDialog.Builder(this)
-            .setTitle("Create license")
-            .setView(daysInput)
+            .setTitle("Generate license")
+            .setView(input)
             .setPositiveButton("Generate") { _, _ ->
 
-                val days =
-                    daysInput.text.toString().toLongOrNull()
+                val days = input.text.toString().toLongOrNull()
 
                 if (days == null || days !in 1..3650) {
-
                     Toast.makeText(
                         this,
                         "Enter 1–3650 days",
-                        Toast.LENGTH_LONG
+                        Toast.LENGTH_SHORT
                     ).show()
-
                     return@setPositiveButton
                 }
 
-                val code =
-                    (10000000 + SecureRandom().nextInt(90000000))
-                        .toString()
+                val code = (
+                    10000000 + SecureRandom().nextInt(90000000)
+                ).toString()
 
                 val records = readArray("licenses")
 
@@ -410,8 +441,7 @@ class MainActivity : Activity() {
                 AlertDialog.Builder(this)
                     .setTitle("License generated")
                     .setMessage(
-                        "License key: $code\n" +
-                        "Valid for $days days.\n\n" +
+                        "Key: $code\nValidity: $days days\n\n" +
                         "Local prototype only."
                     )
                     .setPositiveButton("OK", null)
@@ -427,7 +457,6 @@ class MainActivity : Activity() {
             hint = "8-digit license key"
             inputType =
                 android.text.InputType.TYPE_CLASS_NUMBER
-            setTextColor(Color.WHITE)
         }
 
         AlertDialog.Builder(this)
@@ -445,17 +474,16 @@ class MainActivity : Activity() {
 
                 for (i in 0 until records.length()) {
 
-                    val item = records.optJSONObject(i) ?: continue
+                    val item = records.optJSONObject(i)
+                        ?: continue
 
                     if (item.optString("code") == key) {
-
                         item.put("revoked", revoke)
                         found = true
                     }
                 }
 
                 if (found) {
-
                     adminPrefs.edit()
                         .putString("licenses", records.toString())
                         .apply()
@@ -464,15 +492,17 @@ class MainActivity : Activity() {
                 Toast.makeText(
                     this,
                     if (found) "License updated"
-                    else "Key not found",
-                    Toast.LENGTH_LONG
+                    else "License not found",
+                    Toast.LENGTH_SHORT
                 ).show()
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
+    // --------------------------------------------------
     // BAN MANAGEMENT
+    // --------------------------------------------------
 
     private fun changeBanStatus(ban: Boolean) {
 
@@ -480,7 +510,6 @@ class MainActivity : Activity() {
             hint = "Phone number with country code"
             inputType =
                 android.text.InputType.TYPE_CLASS_PHONE
-            setTextColor(Color.WHITE)
         }
 
         AlertDialog.Builder(this)
@@ -488,37 +517,30 @@ class MainActivity : Activity() {
             .setView(input)
             .setPositiveButton("Apply") { _, _ ->
 
-                val number =
-                    input.text.toString().filter { it.isDigit() }
+                val number = input.text.toString()
+                    .filter { it.isDigit() }
 
                 if (number.length < 8) {
-
                     Toast.makeText(
                         this,
-                        "Enter a valid phone number",
+                        "Invalid number",
                         Toast.LENGTH_SHORT
                     ).show()
-
                     return@setPositiveButton
                 }
 
-                val bans = readArray("bans")
+                val old = readArray("bans")
                 val updated = JSONArray()
 
-                var existed = false
+                for (i in 0 until old.length()) {
+                    val value = old.optString(i)
 
-                for (i in 0 until bans.length()) {
-
-                    val value = bans.optString(i)
-
-                    if (value == number) {
-                        existed = true
-                    } else {
+                    if (value != number) {
                         updated.put(value)
                     }
                 }
 
-                if (ban && !existed) {
+                if (ban) {
                     updated.put(number)
                 }
 
@@ -528,9 +550,9 @@ class MainActivity : Activity() {
 
                 Toast.makeText(
                     this,
-                    if (ban) "Number added to local ban list"
-                    else "Number removed from local ban list",
-                    Toast.LENGTH_LONG
+                    if (ban) "Number added to local list"
+                    else "Number removed from local list",
+                    Toast.LENGTH_SHORT
                 ).show()
             }
             .setNegativeButton("Cancel", null)
@@ -538,7 +560,6 @@ class MainActivity : Activity() {
     }
 
     private fun readArray(key: String): JSONArray {
-
         return runCatching {
             JSONArray(adminPrefs.getString(key, "[]"))
         }.getOrElse {
@@ -546,57 +567,58 @@ class MainActivity : Activity() {
         }
     }
 
-    // RECORDS
+    // --------------------------------------------------
+    // OWNER RECORDS
+    // --------------------------------------------------
 
     private fun showAdminRecords() {
 
         val licenses = readArray("licenses")
         val bans = readArray("bans")
 
-        val lines = StringBuilder("LICENSES\n")
+        val result = StringBuilder("LICENSES\n\n")
 
         for (i in 0 until licenses.length()) {
 
-            val item = licenses.optJSONObject(i) ?: continue
+            val item = licenses.optJSONObject(i)
+                ?: continue
 
-            lines.append(item.optString("code"))
+            val state = when {
+                item.optBoolean("revoked") -> "REVOKED"
+                item.optLong("expiresAt") <
+                    System.currentTimeMillis() -> "EXPIRED"
+                else -> "ACTIVE"
+            }
+
+            result.append(item.optString("code"))
                 .append(" • ")
-                .append(
-                    if (item.optBoolean("revoked")) "REVOKED"
-                    else if (
-                        item.optLong("expiresAt") <
-                        System.currentTimeMillis()
-                    ) "EXPIRED"
-                    else "ACTIVE"
-                )
-                .append('\n')
+                .append(state)
+                .append("\n")
         }
 
-        lines.append("\nBANNED NUMBERS\n")
+        result.append("\nBANNED NUMBERS\n\n")
 
         for (i in 0 until bans.length()) {
-            lines.append(bans.optString(i)).append('\n')
+            result.append(bans.optString(i)).append("\n")
         }
 
         AlertDialog.Builder(this)
-            .setTitle("Local records")
-            .setMessage(lines.toString())
+            .setTitle("Owner records")
+            .setMessage(result.toString())
             .setPositiveButton("OK", null)
             .show()
     }
 
-    // SUPPORT
-
     private fun showSupportDetails() {
 
         AlertDialog.Builder(this)
-            .setTitle("Support & owner")
+            .setTitle("Support & Owner")
             .setMessage(
                 "Owner phone: $ownerPhone\n" +
                 "Owner Discord ID: $ownerDiscordId\n" +
                 "Server ID: $supportServerId\n" +
                 "Support: $supportInvite\n\n" +
-                "Owner access is a local prototype."
+                "License and ban records are stored locally."
             )
             .setPositiveButton("Open Discord") { _, _ ->
 
@@ -611,136 +633,90 @@ class MainActivity : Activity() {
             .show()
     }
 
-    // OGxISAI PANEL
+    // --------------------------------------------------
+    // EXTENSION PANEL
+    // --------------------------------------------------
 
     private fun showExtensions() {
 
-        val items = arrayOf(
-            "Open OGxISAI microphone panel",
+        val options = arrayOf(
+            "Open OGxISAI panel",
             "Import CSS theme ZIP",
-            "About compatibility"
+            "Compatibility information"
         )
 
         AlertDialog.Builder(this)
-            .setTitle("Alise×Kutty • Black & Gold")
-            .setItems(items) { _, which ->
+            .setTitle("Alise×Kutty • OGxISAI")
+            .setItems(options) { _, which ->
 
                 when (which) {
 
                     0 -> {
-
                         injectOgxIsai()
 
                         Toast.makeText(
                             this,
                             "OGxISAI injection requested",
-                            Toast.LENGTH_LONG
+                            Toast.LENGTH_SHORT
                         ).show()
                     }
 
                     1 -> openZipPicker()
 
-                    2 -> {
-
-                        AlertDialog.Builder(this)
-                            .setTitle("Compatibility")
-                            .setMessage(
-                                "OGxISAI is a browser extension " +
-                                "embedded into WhatsApp Web.\n\n" +
-                                "Some features may not work in Android WebView. " +
-                                "Processed microphone audio is not guaranteed."
-                            )
-                            .setPositiveButton("OK", null)
-                            .show()
-                    }
+                    2 -> AlertDialog.Builder(this)
+                        .setTitle("Compatibility")
+                        .setMessage(
+                            "This app uses WhatsApp Web inside Android WebView. " +
+                            "Microphone and camera access depend on WebView support. " +
+                            "Group calls, incoming calls and background calls " +
+                            "are not guaranteed."
+                        )
+                        .setPositiveButton("OK", null)
+                        .show()
                 }
             }
             .setNegativeButton("Close", null)
             .show()
     }
 
-    // INJECT OGXISAI
-
-    private fun injectOgxIsai() {
-
-        try {
-
-            val js = assets.open("ogxisai/injector.js")
-                .bufferedReader()
-                .use { it.readText() }
-
-            val encoded =
-                android.util.Base64.encodeToString(
-                    js.toByteArray(Charsets.UTF_8),
-                    android.util.Base64.NO_WRAP
-                )
-
-            val wrapper =
-                "(function(){" +
-                "var code=atob('$encoded');" +
-                "(0,Function)(code)();" +
-                "})();"
-
-            web.evaluateJavascript(wrapper, null)
-
-        } catch (e: Exception) {
-
-            Toast.makeText(
-                this,
-                "OGxISAI error: ${e.message}",
-                Toast.LENGTH_LONG
-            ).show()
-        }
-    }
-
-    // ZIP IMPORT
+    // --------------------------------------------------
+    // CSS ZIP IMPORT
+    // --------------------------------------------------
 
     private fun openZipPicker() {
 
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "application/zip"
-
-            putExtra(
-                Intent.EXTRA_MIME_TYPES,
-                arrayOf(
-                    "application/zip",
-                    "application/x-zip-compressed",
-                    "application/octet-stream"
-                )
-            )
         }
 
         startActivityForResult(intent, pickZip)
     }
 
-    @Deprecated("Deprecated Android API")
+    @Deprecated("Legacy file picker callback")
     override fun onActivityResult(
         requestCode: Int,
         resultCode: Int,
         data: Intent?
     ) {
-
         super.onActivityResult(requestCode, resultCode, data)
 
         if (
             requestCode == pickZip &&
             resultCode == Activity.RESULT_OK
         ) {
-
             val uri = data?.data ?: return
 
             try {
-
                 importCssZip(uri)
+
+                applyEnabledStyles()
 
                 Toast.makeText(
                     this,
                     "CSS theme imported",
-                    Toast.LENGTH_LONG
+                    Toast.LENGTH_SHORT
                 ).show()
-
-                applyEnabledStyles()
 
             } catch (e: Exception) {
 
@@ -766,7 +742,9 @@ class MainActivity : Activity() {
 
         contentResolver.openInputStream(uri).use { raw ->
 
-            requireNotNull(raw) { "Cannot open ZIP" }
+            requireNotNull(raw) {
+                "Cannot open ZIP"
+            }
 
             ZipInputStream(raw).use { zip ->
 
@@ -776,8 +754,7 @@ class MainActivity : Activity() {
 
                     if (!entry.isDirectory) {
 
-                        val name =
-                            entry.name.substringAfterLast('/')
+                        val name = entry.name.substringAfterLast('/')
 
                         require(
                             name == "manifest.json" ||
@@ -789,7 +766,7 @@ class MainActivity : Activity() {
                         val bytes = zip.readBytes()
 
                         require(bytes.size <= 512 * 1024) {
-                            "Extension file too large"
+                            "File too large"
                         }
 
                         File(target, name).writeBytes(bytes)
@@ -813,24 +790,16 @@ class MainActivity : Activity() {
             "ZIP must contain manifest.json and style.css"
         }
 
-        val manifest =
-            JSONObject(File(target, "manifest.json").readText())
+        val manifest = JSONObject(
+            File(target, "manifest.json").readText()
+        )
 
         require(manifest.optString("entry") == "style.css") {
-            "manifest entry must be style.css"
+            "Manifest entry must be style.css"
         }
-
-        if (manifest.optString("name").isBlank()) {
-            manifest.put("name", id)
-        }
-
-        File(target, "manifest.json")
-            .writeText(manifest.toString(2))
 
         File(target, "enabled.flag").writeText("enabled")
     }
-
-    // APPLY CSS
 
     private fun applyEnabledStyles() {
 
@@ -844,74 +813,79 @@ class MainActivity : Activity() {
                     File(it, "style.css").readText()
                 }.getOrNull()
             }
-            ?.joinToString("\n") ?: ""
+            ?.joinToString("\n")
+            ?: ""
 
-        val encoded =
-            android.util.Base64.encodeToString(
-                css.toByteArray(Charsets.UTF_8),
-                android.util.Base64.NO_WRAP
-            )
+        val encoded = android.util.Base64.encodeToString(
+            css.toByteArray(Charsets.UTF_8),
+            android.util.Base64.NO_WRAP
+        )
 
         web.evaluateJavascript(
-            "(function(){" +
-            "var c=atob('$encoded');" +
-            "var s=document.getElementById('alisekutty-extension-css');" +
-            "if(!s){" +
-            "s=document.createElement('style');" +
-            "s.id='alisekutty-extension-css';" +
-            "document.head.appendChild(s);" +
-            "}" +
-            "s.textContent=c;" +
-            "})();",
+            """
+            (function() {
+                var css = atob('$encoded');
+                var style = document.getElementById('alisekutty-css');
+
+                if (!style) {
+                    style = document.createElement('style');
+                    style.id = 'alisekutty-css';
+                    document.head.appendChild(style);
+                }
+
+                style.textContent = css;
+            })();
+            """.trimIndent(),
             null
         )
     }
 
-    // MICROPHONE PERMISSION
+    // --------------------------------------------------
+    // CAMERA AND MICROPHONE PERMISSIONS
+    // --------------------------------------------------
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-
         super.onRequestPermissionsResult(
             requestCode,
             permissions,
             grantResults
         )
 
-        if (requestCode == micRequest) {
+        if (requestCode == permissionRequestCode) {
 
             val request = pendingWebPermission
             pendingWebPermission = null
 
-            if (
+            val allGranted =
                 grantResults.isNotEmpty() &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED &&
-                request != null
-            ) {
+                grantResults.all {
+                    it == PackageManager.PERMISSION_GRANTED
+                }
+
+            if (request != null && allGranted) {
 
                 val allowed = request.resources.filter {
-                    it == PermissionRequest.RESOURCE_AUDIO_CAPTURE
+                    it == PermissionRequest.RESOURCE_AUDIO_CAPTURE ||
+                    it == PermissionRequest.RESOURCE_VIDEO_CAPTURE
                 }
 
-                if (allowed.isNotEmpty()) {
-                    request.grant(allowed.toTypedArray())
-                } else {
-                    request.deny()
-                }
+                request.grant(allowed.toTypedArray())
 
             } else {
-
                 request?.deny()
             }
         }
     }
 
-    // BACK BUTTON
+    // --------------------------------------------------
+    // BACK BUTTON AND CLEANUP
+    // --------------------------------------------------
 
-    @Deprecated("Deprecated Android API")
+    @Deprecated("Legacy Android back callback")
     override fun onBackPressed() {
 
         if (::web.isInitialized && web.canGoBack()) {
