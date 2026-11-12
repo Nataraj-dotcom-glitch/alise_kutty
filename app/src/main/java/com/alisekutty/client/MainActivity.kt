@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.net.Uri
 import android.os.Bundle
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
@@ -19,8 +18,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -36,8 +35,6 @@ class MainActivity : Activity() {
         private const val MIC_CAMERA_REQUEST = 4103
         private const val PREFS = "alisekutty_local_licenses"
         private const val WA_URL = "https://web.whatsapp.com/"
-
-        // Desktop page scaling percentage
         private const val DESKTOP_SCALE = 35
     }
 
@@ -66,7 +63,7 @@ class MainActivity : Activity() {
         showLogin()
     }
 
-    // LOGIN SCREEN
+    // LOGIN
 
     private fun showLogin() {
 
@@ -98,33 +95,29 @@ class MainActivity : Activity() {
 
         panel.addView(accessInput)
 
-        panel.addView(Button(this).apply {
-            text = "LOGIN"
+        panel.addView(makeGoldButton("LOGIN") {
 
-            setOnClickListener {
+            val value = accessInput.text.toString().filter {
+                it.isDigit()
+            }
 
-                val value = accessInput.text.toString().filter {
-                    it.isDigit()
+            when {
+
+                value == OWNER_PHONE -> {
+                    isOwner = true
+                    showMainScreen()
                 }
 
-                when {
-
-                    value == OWNER_PHONE -> {
-                        isOwner = true
-                        showMainScreen()
-                    }
-
-                    isValidLicense(value) -> {
-                        isOwner = false
-                        showMainScreen()
-                    }
-
-                    else -> Toast.makeText(
-                        this@MainActivity,
-                        "Invalid owner number or license key",
-                        Toast.LENGTH_LONG
-                    ).show()
+                isValidLicense(value) -> {
+                    isOwner = false
+                    showMainScreen()
                 }
+
+                else -> Toast.makeText(
+                    this,
+                    "Invalid owner number or license key",
+                    Toast.LENGTH_LONG
+                ).show()
             }
         })
 
@@ -172,12 +165,12 @@ class MainActivity : Activity() {
             setBackgroundColor(dark)
         }
 
-        // TOP HEADER
+        // HEADER
 
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(10, 7, 10, 7)
+            setPadding(6, 5, 6, 5)
             setBackgroundColor(Color.BLACK)
         }
 
@@ -193,8 +186,8 @@ class MainActivity : Activity() {
 
             scaleType = ImageView.ScaleType.FIT_CENTER
 
-            layoutParams = LinearLayout.LayoutParams(48, 48).apply {
-                rightMargin = 8
+            layoutParams = LinearLayout.LayoutParams(42, 42).apply {
+                rightMargin = 5
             }
         })
 
@@ -203,9 +196,7 @@ class MainActivity : Activity() {
         top.addView(TextView(this).apply {
 
             text = "Alise×Kutty ◆"
-
-            textSize = 18f
-
+            textSize = 16f
             setTextColor(gold)
 
             layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
@@ -214,33 +205,24 @@ class MainActivity : Activity() {
         // OWNER BUTTON
 
         if (isOwner) {
-            top.addView(
-                makeGoldButton("OWNER") {
-                    showOwnerDashboard()
-                }
-            )
+            top.addView(makeGoldButton("OWNER") {
+                showOwnerDashboard()
+            })
         }
 
-        // OGXISAI BUTTON
+        // INJECTOR BUTTON
 
-        top.addView(
-            makeGoldButton("OGxISAI") {
-                injectOgxIsai()
-            }
-        )
+        top.addView(makeGoldButton("Alise×Kutty") {
+            injectOgxIsai()
+        })
 
-        // STATUS BAR
+        // STATUS
 
         val status = TextView(this).apply {
-
             text = "BLACK & GOLD • WhatsApp Web desktop view"
-
-            textSize = 12f
-
+            textSize = 11f
             setTextColor(gold)
-
             setPadding(10, 7, 10, 7)
-
             setBackgroundColor(Color.rgb(25, 22, 12))
         }
 
@@ -253,49 +235,34 @@ class MainActivity : Activity() {
             settings.apply {
 
                 javaScriptEnabled = true
-
                 domStorageEnabled = true
-
                 databaseEnabled = true
-
                 loadsImagesAutomatically = true
 
                 javaScriptCanOpenWindowsAutomatically = true
-
                 mediaPlaybackRequiresUserGesture = false
-
-                // DESKTOP USER AGENT
 
                 userAgentString =
                     "Mozilla/5.0 (X11; Linux x86_64) " +
                     "AppleWebKit/537.36 (KHTML, like Gecko) " +
                     "Chrome/131.0.0.0 Safari/537.36"
 
-                // DESKTOP PAGE FITTING
-
                 useWideViewPort = true
-
                 loadWithOverviewMode = true
 
-                setSupportZoom(false)
-
-                builtInZoomControls = false
-
+                setSupportZoom(true)
+                builtInZoomControls = true
                 displayZoomControls = false
 
                 textZoom = 100
 
                 allowContentAccess = true
-
                 allowFileAccess = true
             }
 
-            // IMPORTANT SCREEN WIDTH FIX
-
             setInitialScale(DESKTOP_SCALE)
 
-            isHorizontalScrollBarEnabled = false
-
+            isHorizontalScrollBarEnabled = true
             isVerticalScrollBarEnabled = true
 
             overScrollMode = WebView.OVER_SCROLL_NEVER
@@ -303,7 +270,7 @@ class MainActivity : Activity() {
             CookieManager.getInstance()
                 .setAcceptThirdPartyCookies(this, true)
 
-            // WEB PERMISSIONS
+            // CAMERA AND MICROPHONE
 
             webChromeClient = object : WebChromeClient() {
 
@@ -312,6 +279,13 @@ class MainActivity : Activity() {
                 ) {
 
                     runOnUiThread {
+
+                        if (
+                            request.origin.host != "web.whatsapp.com"
+                        ) {
+                            request.deny()
+                            return@runOnUiThread
+                        }
 
                         val resources = request.resources
 
@@ -348,7 +322,6 @@ class MainActivity : Activity() {
                         } else {
 
                             pendingWebPermission = request
-
                             pendingWebResources = resources
 
                             ActivityCompat.requestPermissions(
@@ -365,15 +338,13 @@ class MainActivity : Activity() {
                 ) {
 
                     if (pendingWebPermission == request) {
-
                         pendingWebPermission = null
-
                         pendingWebResources = emptyArray()
                     }
                 }
             }
 
-            // WEB PAGE NAVIGATION
+            // WEBSITE NAVIGATION
 
             webViewClient = object : WebViewClient() {
 
@@ -389,7 +360,6 @@ class MainActivity : Activity() {
                             "https://web.whatsapp.com"
                         ) == true
                     ) {
-
                         injectOgxIsai()
                     }
                 }
@@ -401,12 +371,14 @@ class MainActivity : Activity() {
 
                     val url = request?.url ?: return false
 
+                    val host = url.host ?: return false
+
                     return if (
                         url.scheme == "https" &&
                         (
-                            url.host == "web.whatsapp.com" ||
-                            url.host == "www.whatsapp.com" ||
-                            url.host == "whatsapp.com"
+                            host == "web.whatsapp.com" ||
+                            host == "www.whatsapp.com" ||
+                            host == "whatsapp.com"
                         )
                     ) {
 
@@ -415,14 +387,12 @@ class MainActivity : Activity() {
                     } else {
 
                         try {
-
                             startActivity(
                                 android.content.Intent(
                                     android.content.Intent.ACTION_VIEW,
-                                    Uri.parse(url.toString())
+                                    url
                                 )
                             )
-
                         } catch (_: Exception) {
                         }
 
@@ -432,9 +402,36 @@ class MainActivity : Activity() {
             }
         }
 
-        root.addView(top)
+        // ZOOM TOOLBAR
 
+        val zoomBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+            setBackgroundColor(Color.BLACK)
+        }
+
+        zoomBar.addView(makeGoldButton("−") {
+            web.zoomOut()
+        })
+
+        zoomBar.addView(makeGoldButton("＋") {
+            web.zoomIn()
+        })
+
+        zoomBar.addView(makeGoldButton("FIT") {
+            web.setInitialScale(DESKTOP_SCALE)
+            web.zoomOut()
+        })
+
+        zoomBar.addView(makeGoldButton("RELOAD") {
+            web.reload()
+        })
+
+        // ADD VIEWS
+
+        root.addView(top)
         root.addView(status)
+        root.addView(zoomBar)
 
         root.addView(
             web,
@@ -446,8 +443,6 @@ class MainActivity : Activity() {
         )
 
         setContentView(root)
-
-        // LOAD WHATSAPP
 
         web.loadUrl(WA_URL)
     }
@@ -462,9 +457,9 @@ class MainActivity : Activity() {
         return Button(this).apply {
 
             text = label
+            textSize = 11f
 
             setTextColor(Color.BLACK)
-
             setBackgroundColor(gold)
 
             setOnClickListener {
@@ -499,11 +494,9 @@ class MainActivity : Activity() {
                     2 -> showLicenseRecords()
 
                     3 -> {
-
                         isOwner = false
 
                         web.stopLoading()
-
                         web.destroy()
 
                         showLogin()
@@ -521,7 +514,6 @@ class MainActivity : Activity() {
         val daysInput = EditText(this).apply {
 
             hint = "Validity in days"
-
             setText("30")
 
             inputType =
@@ -529,13 +521,9 @@ class MainActivity : Activity() {
         }
 
         AlertDialog.Builder(this)
-
             .setTitle("Generate license")
-
             .setMessage("Create a license for another user.")
-
             .setView(daysInput)
-
             .setPositiveButton("Generate") { _, _ ->
 
                 val days =
@@ -588,20 +576,14 @@ class MainActivity : Activity() {
                 )
 
                 AlertDialog.Builder(this)
-
                     .setTitle("License generated")
-
                     .setMessage(
                         "$code\nValid for $days days.\nCopied to clipboard."
                     )
-
                     .setPositiveButton("OK", null)
-
                     .show()
             }
-
             .setNegativeButton("Cancel", null)
-
             .show()
     }
 
@@ -618,11 +600,8 @@ class MainActivity : Activity() {
         }
 
         AlertDialog.Builder(this)
-
             .setTitle("Revoke license")
-
             .setView(input)
-
             .setPositiveButton("Revoke") { _, _ ->
 
                 val code =
@@ -638,15 +617,12 @@ class MainActivity : Activity() {
                         records.optJSONObject(i) ?: continue
 
                     if (item.optString("code") == code) {
-
                         item.put("revoked", true)
-
                         found = true
                     }
                 }
 
                 if (found) {
-
                     prefs.edit()
                         .putString("licenses", records.toString())
                         .apply()
@@ -655,15 +631,13 @@ class MainActivity : Activity() {
                 Toast.makeText(
                     this,
                     if (found)
-                        "License revoked"
+                        "License revoked on this device"
                     else
                         "License not found on this device",
                     Toast.LENGTH_LONG
                 ).show()
             }
-
             .setNegativeButton("Cancel", null)
-
             .show()
     }
 
@@ -705,13 +679,9 @@ class MainActivity : Activity() {
         }
 
         AlertDialog.Builder(this)
-
             .setTitle("License records")
-
             .setMessage(text.toString())
-
             .setPositiveButton("OK", null)
-
             .show()
     }
 
@@ -720,18 +690,13 @@ class MainActivity : Activity() {
     private fun readArray(key: String): JSONArray {
 
         return runCatching {
-
-            JSONArray(
-                prefs.getString(key, "[]")
-            )
-
+            JSONArray(prefs.getString(key, "[]"))
         }.getOrElse {
-
             JSONArray()
         }
     }
 
-    // OGXISAI INJECTOR
+    // ALISE×KUTTY INJECTOR
 
     private fun injectOgxIsai() {
 
@@ -747,7 +712,7 @@ class MainActivity : Activity() {
 
             Toast.makeText(
                 this,
-                "OGxISAI injector asset is missing",
+                "Injector asset is missing",
                 Toast.LENGTH_LONG
             ).show()
 
@@ -783,11 +748,9 @@ class MainActivity : Activity() {
         if (requestCode == MIC_CAMERA_REQUEST) {
 
             val request = pendingWebPermission
-
             val resources = pendingWebResources
 
             pendingWebPermission = null
-
             pendingWebResources = emptyArray()
 
             val allGranted =
@@ -797,11 +760,8 @@ class MainActivity : Activity() {
                 }
 
             if (allGranted && request != null) {
-
                 request.grant(resources)
-
             } else {
-
                 request?.deny()
 
                 Toast.makeText(
@@ -822,11 +782,8 @@ class MainActivity : Activity() {
             ::web.isInitialized &&
             web.canGoBack()
         ) {
-
             web.goBack()
-
         } else {
-
             super.onBackPressed()
         }
     }
@@ -836,9 +793,7 @@ class MainActivity : Activity() {
     override fun onDestroy() {
 
         if (::web.isInitialized) {
-
             web.stopLoading()
-
             web.destroy()
         }
 
